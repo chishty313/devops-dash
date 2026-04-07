@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-STATE_DIR="/opt/qtec"
-STATE_FILE="${STATE_DIR}/.active_color"
-UPSTREAM_FILE="./nginx/conf.d/backend_upstream.conf"
-COMPOSE_FILE="./docker-compose.yml"
+# Project root (works no matter where /opt/qtec or ~/project/... is)
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+STATE_FILE="${ROOT_DIR}/.active_color"
+UPSTREAM_FILE="${ROOT_DIR}/nginx/conf.d/backend_upstream.conf"
+COMPOSE_FILE="${ROOT_DIR}/docker-compose.yml"
 
-mkdir -p "${STATE_DIR}"
+cd "${ROOT_DIR}"
 
 if [[ -f "${STATE_FILE}" ]]; then
   ACTIVE_COLOR="$(cat "${STATE_FILE}")"
@@ -24,7 +25,7 @@ echo "Active color: ${ACTIVE_COLOR}"
 echo "Deploying inactive color: ${INACTIVE_COLOR}"
 
 docker compose -f "${COMPOSE_FILE}" pull "backend_${INACTIVE_COLOR}" frontend
-docker compose -f "${COMPOSE_FILE}" up -d mongodb prometheus grafana frontend
+docker compose -f "${COMPOSE_FILE}" up -d prometheus grafana frontend
 docker compose -f "${COMPOSE_FILE}" up -d "backend_${INACTIVE_COLOR}"
 
 echo "Running health checks against backend_${INACTIVE_COLOR}..."

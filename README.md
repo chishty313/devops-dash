@@ -118,6 +118,7 @@ Configure under **Settings → Secrets and variables → Actions**:
 | `SSH_PRIVATE_KEY` | Yes (full private key for VM SSH) |
 | `SERVER_IP` | Yes |
 | `SERVER_USER` | Yes |
+| `DEPLOY_PATH` | No — absolute path on the VM where the repo is cloned. Defaults to `/opt/qtec` if unset. Example: `/home/azureuser/project/devops-dashboard/devops-dash` |
 
 You do **not** need `GHCR_TOKEN`; the workflow uses built-in `permissions: packages: write`.
 
@@ -138,7 +139,7 @@ Ensure **Settings → Actions → General** allows workflows, and for private re
 
 `scripts/deploy.sh` uses blue-green rollout:
 
-1. Detect current active color from `/opt/qtec/.active_color`.
+1. Detect current active color from `.active_color` in the project root (same directory as `docker-compose.yml`).
 2. Select inactive color for new release.
 3. Pull and start inactive backend container.
 4. Wait until health check passes on `/api/status`.
@@ -209,7 +210,7 @@ curl -X POST http://localhost/api/data -H "Content-Type: application/json" -d '{
 sudo certbot certonly --standalone -d qtec.chishty.me
 ```
 
-3. Clone repo to `/opt/qtec`.
+3. Clone the repo to a fixed path on the VM (e.g. `/opt/qtec` or `~/project/.../devops-dash`). If you do not use `/opt/qtec`, set GitHub secret **`DEPLOY_PATH`** to that absolute path.
 4. Configure `.env`.
 5. Run:
 

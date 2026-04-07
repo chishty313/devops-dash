@@ -92,8 +92,12 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script_stop: true
+          # Set repo secret DEPLOY_PATH to your clone path on the VM if not using /opt/qtec
+          # Example: /home/azureuser/project/devops-dashboard/devops-dash
           script: |
-            cd /opt/qtec
+            set -e
+            DEPLOY_DIR="${{ secrets.DEPLOY_PATH }}"
+            cd "${DEPLOY_DIR:-/opt/qtec}"
             git pull origin main
             OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
             sed -i "s/^IMAGE_TAG=.*/IMAGE_TAG=${IMAGE_TAG}/" .env || echo "IMAGE_TAG=${IMAGE_TAG}" >> .env

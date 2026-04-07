@@ -44,7 +44,7 @@ This document records what was implemented and how to operate/troubleshoot it.
 
 Blue-green deployment implementation:
 
-1. Reads active color (`/opt/qtec/.active_color`)
+1. Reads active color (`.active_color` in the project root)
 2. Starts inactive backend
 3. Health checks inactive backend
 4. Rewrites upstream to inactive backend
@@ -125,7 +125,7 @@ If manual rollback is required after switch:
    ```bash
    docker compose exec -T nginx nginx -s reload
    ```
-3. Update `/opt/qtec/.active_color` accordingly.
+3. Update `.active_color` in your project directory accordingly.
 
 ## Troubleshooting
 
@@ -142,7 +142,8 @@ If manual rollback is required after switch:
   - `SERVER_IP`
   - `SERVER_USER`
 - Image push uses `GITHUB_TOKEN` (no `GHCR_TOKEN` secret required).
-- Ensure VM path is `/opt/qtec` and `.env` has **`GITHUB_OWNER` in lowercase** to match GHCR image names.
+- Set optional secret **`DEPLOY_PATH`** to your VM clone path if it is not `/opt/qtec` (otherwise the deploy step fails with `cd: No such file or directory`).
+- Ensure `.env` on the VM has **`GITHUB_OWNER` in lowercase** to match GHCR image names.
 
 ## Grafana not loading under `/grafana`
 
