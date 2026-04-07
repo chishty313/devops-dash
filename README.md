@@ -106,6 +106,7 @@ Pipeline file: `.github/workflows/ci-cd.yml`
 
 3. **Deploy**
    - SSH to Azure VM.
+   - Runs `git fetch` + `git reset --hard origin/main` so the VM matches the repo (local edits to tracked files on the server are discarded).
    - Updates `.env` with `IMAGE_TAG` (SHA) and **lowercase** `GITHUB_OWNER`.
    - Runs `scripts/deploy.sh`.
 

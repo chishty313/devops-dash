@@ -31,3 +31,6 @@ Thumbs.db
 .vscode/
 *.swp
 *.swo
+
+# Deploy state on server (blue/green); do not commit
+.active_color

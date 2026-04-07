@@ -137,6 +137,7 @@ If manual rollback is required after switch:
 
 ## CI deploy failures
 
+- **`git pull` / merge errors on the VM**: Do not edit tracked files (e.g. `scripts/deploy.sh`) directly on the server; the workflow uses `git reset --hard origin/main` so the tree matches GitHub. Keep secrets only in `.env` (gitignored).
 - Check GitHub secrets:
   - `SSH_PRIVATE_KEY`
   - `SERVER_IP`

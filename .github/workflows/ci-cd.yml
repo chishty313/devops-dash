@@ -98,7 +98,9 @@ jobs:
             set -e
             DEPLOY_DIR="${{ secrets.DEPLOY_PATH }}"
             cd "${DEPLOY_DIR:-/opt/qtec}"
-            git pull origin main
+            # Match GitHub exactly; avoids "local changes would be overwritten" from edits on the VM
+            git fetch origin main
+            git reset --hard origin/main
             OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
             sed -i "s/^IMAGE_TAG=.*/IMAGE_TAG=${IMAGE_TAG}/" .env || echo "IMAGE_TAG=${IMAGE_TAG}" >> .env
             sed -i "s/^GITHUB_OWNER=.*/GITHUB_OWNER=${OWNER}/" .env || echo "GITHUB_OWNER=${OWNER}" >> .env
