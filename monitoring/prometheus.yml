@@ -1,0 +1,18 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: "backend_blue"
+    metrics_path: /api/metrics
+    static_configs:
+      - targets: ["backend_blue:3000"]
+
+  - job_name: "backend_green"
+    metrics_path: /api/metrics
+    static_configs:
+      - targets: ["backend_green:3000"]
+
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["prometheus:9090"]

@@ -1,0 +1,33 @@
+.DS_Store
+.env
+.env.local
+.env.*.local
+**/.env
+!**/.env.example
+node_modules/
+dist/
+coverage/
+*.log
+backend/node_modules/
+frontend/node_modules/
+backend/coverage/
+frontend/dist/
+
+# Secrets and keys
+*.pem
+*.key
+id_rsa
+id_ed25519
+
+# Terraform
+terraform/.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl
+
+# OS / IDE
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
