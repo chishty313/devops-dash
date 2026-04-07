@@ -146,7 +146,9 @@ If manual rollback is required after switch:
 
 ## Grafana not loading under `/grafana`
 
+- Verify `.env` has `DOMAIN=qtec.chishty.me` (must match the hostname in the browser; no `http://`).
 - Verify:
-  - `GF_SERVER_ROOT_URL=https://qtec.chishty.me/grafana/`
+  - `GF_SERVER_ROOT_URL=https://${DOMAIN}/grafana/`
   - `GF_SERVER_SERVE_FROM_SUB_PATH=true`
-- Check Nginx `/grafana/` proxy block.
+- Nginx must pass `X-Forwarded-Proto`, `X-Forwarded-Host`, and `Host` (`$http_host`) so Grafana does not redirect in a loop.
+- After changing Grafana env or nginx: `docker compose up -d grafana nginx` then hard-refresh or clear cookies for the site.
