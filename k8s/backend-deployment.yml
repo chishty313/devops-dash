@@ -35,7 +35,7 @@ spec:
       terminationGracePeriodSeconds: 30
       containers:
         - name: backend
-          image: ghcr.io/your-org/qtec-backend:latest   # replaced by CI with commit SHA
+          image: ghcr.io/${IMAGE_OWNER}/qtec-backend:${IMAGE_TAG}
           imagePullPolicy: Always
           ports:
             - name: http

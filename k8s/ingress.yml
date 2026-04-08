@@ -4,29 +4,34 @@ metadata:
   name: qtec-ingress
   namespace: qtec
   annotations:
-    # TLS certificate issued automatically by cert-manager
-    cert-manager.io/cluster-issuer: letsencrypt-prod
-    # Rate-limit: 100 requests/sec per IP (mirrors Nginx docker-compose config)
+    # SSL is terminated by the Docker nginx proxy BEFORE traffic reaches here.
+    # k3s nginx-ingress therefore receives plain HTTP — no cert-manager needed.
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+
+    # Tell the ingress controller to trust X-Forwarded-* headers from nginx
+    nginx.ingress.kubernetes.io/use-forwarded-headers: "true"
+    nginx.ingress.kubernetes.io/forwarded-for-header: "X-Forwarded-For"
+
+    # Rate-limit: 100 requests/sec per IP (mirrors Docker nginx config)
     nginx.ingress.kubernetes.io/limit-rps: "100"
     nginx.ingress.kubernetes.io/limit-burst-multiplier: "2"
-    # Proxy timeouts for long-running requests
+
+    # Proxy timeouts
     nginx.ingress.kubernetes.io/proxy-connect-timeout: "10"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
-    # Security headers
+
+    # Security headers (inner hop — outer nginx already sets them,
+    # but set here too so direct NodePort access is also secured)
     nginx.ingress.kubernetes.io/configuration-snippet: |
       add_header X-Frame-Options "DENY" always;
       add_header X-Content-Type-Options "nosniff" always;
       add_header X-XSS-Protection "1; mode=block" always;
-      add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
 spec:
   ingressClassName: nginx
-  tls:
-    - hosts:
-        - qtec.chishty.me
-      secretName: qtec-tls
+  # No TLS block — SSL terminates at Docker nginx, not here
   rules:
-    - host: qtec.chishty.me
+    - host: qtec-k8s.chishty.me
       http:
         paths:
           - path: /api

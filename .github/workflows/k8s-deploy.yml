@@ -1,0 +1,73 @@
+name: K8s-Deploy
+
+# Triggers:
+#   1. Automatically after CI-CD workflow completes on main
+#      (images are already built; this job just deploys them to k3s)
+#   2. Manually via workflow_dispatch for emergency/forced re-deploys
+on:
+  workflow_run:
+    workflows: ["CI-CD"]
+    branches: [main]
+    types: [completed]
+
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Image tag to deploy (commit SHA or 'latest')"
+        required: false
+        default: "latest"
+
+concurrency:
+  group: k8s-deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy-k8s:
+    # For workflow_run: only proceed if CI-CD succeeded.
+    # For manual dispatch: always run.
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+
+    runs-on: ubuntu-latest
+
+    steps:
+      # ── Determine image tag ──────────────────────────────────────────────
+      # workflow_run → use the HEAD SHA of the triggering run
+      # workflow_dispatch → use the manual input (default: latest)
+      - name: Set image tag
+        id: tag
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_run" ]]; then
+            echo "IMAGE_TAG=${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "IMAGE_TAG=${{ github.event.inputs.image_tag }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      # ── Deploy via SSH ────────────────────────────────────────────────────
+      - name: Deploy k8s manifests over SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host:     ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.SERVER_USER }}
+          key:      ${{ secrets.SSH_PRIVATE_KEY }}
+          script_stop: true
+          script: |
+            set -e
+            DEPLOY_DIR="${{ secrets.DEPLOY_PATH }}"
+            cd "${DEPLOY_DIR:-/opt/qtec}"
+
+            # Pull latest manifests (git already reset by ci-cd.yml deploy job)
+            # For manual dispatch, reset ourselves
+            git fetch origin main
+            git reset --hard origin/main
+
+            # Set kubeconfig (k3s)
+            export KUBECONFIG="${HOME}/.kube/config"
+
+            # Image details for envsubst in k8s-deploy.sh
+            export IMAGE_OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+            export IMAGE_TAG="${{ steps.tag.outputs.IMAGE_TAG }}"
+
+            chmod +x scripts/k8s-deploy.sh
+            ./scripts/k8s-deploy.sh
