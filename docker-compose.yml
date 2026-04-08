@@ -61,8 +61,8 @@ services:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: admin
       # Must match the public URL (HTTPS + subpath) or Grafana redirects in a loop behind nginx
-      GF_SERVER_ROOT_URL: https://${DOMAIN}/grafana/
-      GF_SERVER_DOMAIN: ${DOMAIN}
+      GF_SERVER_ROOT_URL: https://${DOMAIN:-qtec.chishty.me}/grafana/
+      GF_SERVER_DOMAIN: ${DOMAIN:-qtec.chishty.me}
       GF_SERVER_SERVE_FROM_SUB_PATH: "true"
     volumes:
       - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
