@@ -64,10 +64,11 @@ else
   kubectl apply -f \
     "https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-${INGRESS_VERSION}/deploy/static/provider/baremetal/deploy.yaml"
 
-  info "Waiting for ingress controller pod to be ready (up to 3 minutes)..."
-  kubectl wait --namespace "${INGRESS_NS}" \
-    --for=condition=ready pod \
-    --selector=app.kubernetes.io/component=controller \
+  # Wait on the Deployment, not on pods by label: `kubectl wait pod` fails with
+  # "no matching resources found" if pods are not created yet (race) or labels differ.
+  info "Waiting for ingress-nginx-controller deployment (up to 3 minutes)..."
+  kubectl rollout status deployment/ingress-nginx-controller \
+    -n "${INGRESS_NS}" \
     --timeout=180s
 fi
 
