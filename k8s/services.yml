@@ -2,32 +2,50 @@ apiVersion: v1
 kind: Service
 metadata:
   name: backend
+  namespace: qtec
+  labels:
+    app: backend
+    app.kubernetes.io/name: backend
 spec:
   selector:
     app: backend
   ports:
-    - port: 3000
+    - name: http
+      port: 3000
       targetPort: 3000
+      protocol: TCP
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: frontend
+  namespace: qtec
+  labels:
+    app: frontend
+    app.kubernetes.io/name: frontend
 spec:
   selector:
     app: frontend
   ports:
-    - port: 80
+    - name: http
+      port: 80
       targetPort: 80
+      protocol: TCP
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: mongodb
+  namespace: qtec
+  labels:
+    app: mongodb
+    app.kubernetes.io/name: mongodb
 spec:
-  clusterIP: None
+  clusterIP: None   # headless service for StatefulSet DNS
   selector:
     app: mongodb
   ports:
-    - port: 27017
+    - name: mongo
+      port: 27017
       targetPort: 27017
+      protocol: TCP

@@ -1,0 +1,20 @@
+# Copy this file to terraform.tfvars and fill in your values.
+# terraform.tfvars is gitignored — never commit real secrets.
+#
+#   cp terraform.tfvars.example terraform.tfvars
+
+location            = "eastus"
+resource_group_name = "rg-qtec-devops"
+vm_name             = "vm-qtec-devops"
+vm_size             = "Standard_B2s"
+admin_username      = "azureuser"
+
+# Paste the full content of your public key (e.g. ~/.ssh/id_rsa.pub)
+ssh_public_key = "ssh-rsa AAAA... user@host"
+
+# Lock SSH access to your current IP for security (find it at https://ifconfig.me)
+# Use "*" only for demos.
+allowed_ssh_cidr = "203.0.113.5/32"
+
+# GitHub repo to clone on first boot
+repo_url = "https://github.com/YOUR_USERNAME/qtec-devops-engineer.git"

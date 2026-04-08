@@ -1,0 +1,15 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: backend-pdb
+  namespace: qtec
+  labels:
+    app: backend
+spec:
+  # Ensure at least 1 backend pod is always available during voluntary disruptions
+  # (node drains, cluster upgrades, kubectl delete pod).
+  # With minReplicas=2 on the HPA, one pod can be evicted without downtime.
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: backend

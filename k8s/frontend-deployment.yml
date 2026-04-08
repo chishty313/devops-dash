@@ -2,8 +2,18 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: frontend
+  namespace: qtec
+  labels:
+    app: frontend
+    app.kubernetes.io/name: frontend
+    app.kubernetes.io/component: ui
 spec:
   replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
   selector:
     matchLabels:
       app: frontend
@@ -11,9 +21,42 @@ spec:
     metadata:
       labels:
         app: frontend
+        app.kubernetes.io/name: frontend
     spec:
+      terminationGracePeriodSeconds: 15
       containers:
         - name: frontend
-          image: ghcr.io/your-org/qtec-frontend:latest
+          image: ghcr.io/your-org/qtec-frontend:latest   # replaced by CI with commit SHA
+          imagePullPolicy: Always
           ports:
-            - containerPort: 80
+            - name: http
+              containerPort: 80
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: false   # nginx image requires root to bind :80
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop: ["ALL"]
+              add: ["NET_BIND_SERVICE"]

@@ -2,12 +2,17 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: backend
+  namespace: qtec
+  labels:
+    app: backend
+    app.kubernetes.io/name: backend
+    app.kubernetes.io/component: api
 spec:
   replicas: 2
   strategy:
     type: RollingUpdate
     rollingUpdate:
-      maxUnavailable: 0
+      maxUnavailable: 0   # zero-downtime: never take a pod offline before new one is ready
       maxSurge: 1
   selector:
     matchLabels:
@@ -16,31 +21,79 @@ spec:
     metadata:
       labels:
         app: backend
+        app.kubernetes.io/name: backend
     spec:
+      # Spread replicas across nodes for HA
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: backend
+      # Graceful shutdown window (matches Node.js drain)
+      terminationGracePeriodSeconds: 30
       containers:
         - name: backend
-          image: ghcr.io/your-org/qtec-backend:latest
+          image: ghcr.io/your-org/qtec-backend:latest   # replaced by CI with commit SHA
+          imagePullPolicy: Always
           ports:
-            - containerPort: 3000
+            - name: http
+              containerPort: 3000
+              protocol: TCP
           env:
             - name: NODE_ENV
               value: production
             - name: PORT
               value: "3000"
+            - name: APP_VERSION
+              value: "1.0.0"
+            - name: LOG_LEVEL
+              value: info
+            - name: DEPLOY_COLOR
+              value: blue
             - name: MONGODB_URI
               valueFrom:
                 secretKeyRef:
                   name: qtec-secrets
                   key: mongodb_uri
+          # Readiness: pod receives traffic only after this passes
           readinessProbe:
             httpGet:
               path: /api/status
               port: 3000
-            periodSeconds: 5
             initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 3
+            successThreshold: 1
+          # Liveness: container is restarted if this fails
           livenessProbe:
             httpGet:
-              path: /api/status
+              path: /api/healthz
               port: 3000
-            periodSeconds: 10
             initialDelaySeconds: 15
+            periodSeconds: 10
+            failureThreshold: 3
+          # Resource limits prevent a runaway pod from starving the node
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          # Security context: run as non-root (matches Dockerfile USER node)
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 1000
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          # Writable temp dir for any runtime scratch space
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}

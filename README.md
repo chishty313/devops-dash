@@ -220,17 +220,185 @@ chmod +x scripts/deploy.sh
 ./scripts/deploy.sh
 ```
 
-## 11) Optional Bonus Assets Included
+## 11) Optional Bonus — Container Orchestration (Kubernetes)
 
-- Kubernetes manifests in `k8s/`
-  - backend deployment
-  - frontend deployment
-  - mongodb statefulset
-  - services
-  - ingress
-  - HPA
-- Terraform in `terraform/`
-  - Resource group
-  - VNet + subnet
-  - NSG (22/80/443)
-  - Ubuntu VM + public IP
+### Architecture
+
+```
+Ingress (nginx-ingress + cert-manager)
+  ├── /api  → backend Service → 2–10 backend Pods (HPA)
+  └── /     → frontend Service → 1 frontend Pod
+                                     ↓
+                              mongodb StatefulSet (10 Gi PVC)
+```
+
+### Prerequisites
+
+| Tool | Purpose |
+|------|---------|
+| `kubectl` | Kubernetes CLI |
+| A Kubernetes cluster | AKS / GKE / EKS / local (kind / minikube) |
+| [ingress-nginx](https://kubernetes.github.io/ingress-nginx/) | Ingress controller |
+| [cert-manager](https://cert-manager.io/) | Automatic TLS from Let's Encrypt |
+
+### Manifest files
+
+| File | What it creates |
+|------|----------------|
+| `k8s/namespace.yml` | `qtec` namespace |
+| `k8s/secrets.example.yml` | Secret template (fill before applying) |
+| `k8s/backend-deployment.yml` | 2-replica backend, resource limits, non-root, rolling update |
+| `k8s/frontend-deployment.yml` | 1-replica frontend, rolling update |
+| `k8s/mongodb-statefulset.yml` | Single MongoDB pod with 10 Gi PVC |
+| `k8s/services.yml` | ClusterIP services for backend, frontend, mongodb |
+| `k8s/ingress.yml` | TLS ingress with rate-limit and security headers |
+| `k8s/hpa.yml` | Horizontal Pod Autoscaler (2–10 pods, CPU 70 % / mem 80 %) |
+| `k8s/pdb.yml` | PodDisruptionBudget (minAvailable: 1 — zero-downtime node drains) |
+
+### Deploy steps
+
+```bash
+# 1. Create namespace
+kubectl apply -f k8s/namespace.yml
+
+# 2. Create secret (never commit real values — use the example as a template)
+kubectl create secret generic qtec-secrets \
+  --namespace qtec \
+  --from-literal=mongodb_uri="mongodb+srv://USER:PASS@cluster.mongodb.net/qtec?retryWrites=true&w=majority" \
+  --from-literal=mongo_root_user="admin" \
+  --from-literal=mongo_root_password="changeme"
+
+# 3. Apply all remaining manifests
+kubectl apply -f k8s/mongodb-statefulset.yml
+kubectl apply -f k8s/services.yml
+kubectl apply -f k8s/backend-deployment.yml
+kubectl apply -f k8s/frontend-deployment.yml
+kubectl apply -f k8s/hpa.yml
+kubectl apply -f k8s/pdb.yml
+kubectl apply -f k8s/ingress.yml
+
+# 4. Watch rollout
+kubectl rollout status deployment/backend -n qtec
+kubectl rollout status deployment/frontend -n qtec
+
+# 5. Verify pods
+kubectl get pods -n qtec
+```
+
+### Update image (rolling update — zero downtime)
+
+```bash
+# CI sets this; for manual updates:
+kubectl set image deployment/backend backend=ghcr.io/your-org/qtec-backend:<SHA> -n qtec
+kubectl rollout status deployment/backend -n qtec
+```
+
+`maxUnavailable: 0` + `minAvailable: 1` PDB ensures at least one pod serves traffic throughout the rollout.
+
+### Horizontal scaling
+
+The HPA watches CPU (≥ 70 %) and memory (≥ 80 %) and scales from 2 → 10 replicas automatically. Test with:
+
+```bash
+# Install k6: https://k6.io/docs/getting-started/installation/
+k6 run --vus 50 --duration 60s - <<'EOF'
+import http from 'k6/http';
+export default () => { http.get('https://qtec.chishty.me/api/status'); }
+EOF
+
+kubectl get hpa backend-hpa -n qtec --watch
+```
+
+---
+
+## 12) Optional Bonus — Infrastructure as Code (Terraform)
+
+Terraform provisions the Azure VM (Ubuntu 22.04) and all supporting networking from scratch, including a **cloud-init** bootstrap that installs Docker and clones the repo automatically.
+
+### Resources provisioned
+
+| Resource | Description |
+|---------|-------------|
+| `azurerm_resource_group` | Logical container for all resources |
+| `azurerm_virtual_network` | VNet `10.0.0.0/16` |
+| `azurerm_subnet` | Subnet `10.0.1.0/24` |
+| `azurerm_network_security_group` | Allows SSH (your IP), HTTP 80, HTTPS 443 |
+| `azurerm_public_ip` | Static public IP (Standard SKU) |
+| `azurerm_linux_virtual_machine` | Ubuntu 22.04 LTS, Standard_B2s (2 vCPU / 4 GB) |
+| `custom_data` (cloud-init) | Installs Docker, git; clones repo to `/opt/qtec` |
+
+### Usage
+
+```bash
+cd terraform
+
+# 1. Copy and fill in variables
+cp terraform.tfvars.example terraform.tfvars
+# Edit terraform.tfvars: ssh_public_key, allowed_ssh_cidr, repo_url
+
+# 2. Initialise providers
+terraform init
+
+# 3. Preview what will be created
+terraform plan
+
+# 4. Provision (takes ~2 minutes)
+terraform apply
+
+# 5. Note the outputs
+# vm_public_ip  → use for DNS A record and GitHub Secrets SERVER_IP
+# ssh_command   → copy-paste to connect
+```
+
+### What happens after `terraform apply`
+
+1. Azure creates the VM.
+2. **cloud-init** runs on first boot (~90 seconds):
+   - Installs Docker Engine + Docker Compose plugin.
+   - Clones the repo to `/opt/qtec`.
+   - Makes `scripts/deploy.sh` executable.
+3. Point `qtec.chishty.me` DNS A record to `vm_public_ip`.
+4. SSH in and create `/opt/qtec/.env` (copy `.env.example`, fill in `MONGODB_URI`).
+5. Run Certbot for TLS, then `./scripts/deploy.sh`.
+6. Set GitHub Secrets; subsequent pushes to `main` deploy automatically.
+
+### Tear down
+
+```bash
+terraform destroy
+```
+
+---
+
+## 13) Optional Bonus — Secrets & Security Management
+
+### Security practices in this repository
+
+| Practice | Where applied |
+|---------|--------------|
+| **No hardcoded credentials** | All secrets via environment variables / Kubernetes Secrets |
+| **Non-root container** | `backend/Dockerfile`: `USER node` (UID 1000) |
+| **Read-only root filesystem** | `k8s/backend-deployment.yml`: `readOnlyRootFilesystem: true` |
+| **Dropped Linux capabilities** | `k8s/backend-deployment.yml`: `capabilities.drop: [ALL]` |
+| **GitHub Actions secrets** | `SSH_PRIVATE_KEY`, `SERVER_IP`, `SERVER_USER` — never in code |
+| **Kubernetes Secrets** | `qtec-secrets` for `MONGODB_URI`, Mongo credentials |
+| **`secretKeyRef`** | All sensitive env vars in K8s read from the Secret object |
+| **`.env` gitignored** | `.env` at repo root is in `.gitignore`; only `.env.example` is committed |
+| **SSH key auth only** | NSG + Terraform restrict SSH; no password auth on the VM |
+
+### Secret lifecycle
+
+```
+Local dev  → backend/.env         (gitignored, never committed)
+CI/CD      → GitHub Actions Secrets (encrypted at rest by GitHub)
+Production → /opt/qtec/.env        (on the VM only, not in repo)
+Kubernetes → kubectl create secret  (stored encrypted in etcd)
+```
+
+### Hardening checklist (production)
+
+- [ ] Change Grafana default password (`GF_SECURITY_ADMIN_PASSWORD` in `.env`)
+- [ ] Restrict NSG SSH rule to your static IP (`allowed_ssh_cidr` in `terraform.tfvars`)
+- [ ] Use MongoDB Atlas network access list (allowlist only the VM's public IP)
+- [ ] Rotate `SSH_PRIVATE_KEY` GitHub Secret if the key is ever compromised
+- [ ] Enable Azure Defender for Servers on the resource group (optional, incurs cost)
