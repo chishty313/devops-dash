@@ -1,55 +1,49 @@
 # =============================================================================
-# k8s.conf  —  Optional K8s lane: qtec-k8s.chishty.me
+# k8s.conf.example — Optional K8s lane: qtec-k8.chishty.me
 #
-# Traffic flow:
-#   Browser (HTTPS) → this nginx (SSL termination) → 127.0.0.1:30080
-#   → k3s nginx-ingress (HTTP) → k8s Services → Pods
+# DO NOT rename to k8s.conf until TLS certs exist on the server:
+#   /etc/letsencrypt/live/qtec-k8.chishty.me/fullchain.pem
 #
-# SSL for this subdomain is handled HERE, so k3s ingress stays HTTP-only.
-# The existing qtec.chishty.me (default.conf) is completely untouched.
+# After certbot:
+#   cp nginx/conf.d/k8s.conf.example nginx/conf.d/k8s.conf
+#   docker compose exec nginx nginx -s reload
+#
+# k8s.conf is gitignored so it survives git pull/reset on the VM.
 # =============================================================================
 
-# HTTP → HTTPS redirect
 server {
   listen 80;
-  server_name qtec-k8s.chishty.me;
+  server_name qtec-k8.chishty.me;
   return 301 https://$host$request_uri;
 }
 
-# HTTPS — terminate SSL, proxy to k3s NodePort 30080
 server {
-  listen 443 ssl http2;
-  server_name qtec-k8s.chishty.me;
+  listen 443 ssl;
+  http2 on;
+  server_name qtec-k8.chishty.me;
 
-  ssl_certificate     /etc/letsencrypt/live/qtec-k8s.chishty.me/fullchain.pem;
-  ssl_certificate_key /etc/letsencrypt/live/qtec-k8s.chishty.me/privkey.pem;
+  ssl_certificate     /etc/letsencrypt/live/qtec-k8.chishty.me/fullchain.pem;
+  ssl_certificate_key /etc/letsencrypt/live/qtec-k8.chishty.me/privkey.pem;
   ssl_protocols       TLSv1.2 TLSv1.3;
   ssl_prefer_server_ciphers on;
   ssl_session_cache   shared:SSL_K8S:10m;
 
-  # Security headers (same as prod)
   add_header X-Frame-Options       "DENY"                              always;
   add_header X-Content-Type-Options "nosniff"                          always;
   add_header X-XSS-Protection      "1; mode=block"                    always;
   add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
 
-  # Rate limit (mirrors prod — 100 r/s, burst 200)
   limit_req zone=api_limit burst=200 nodelay;
 
-  # Proxy everything to k3s nginx-ingress NodePort.
-  # host.docker.internal resolves to the VM host thanks to extra_hosts in compose.
   location / {
     proxy_pass         http://host.docker.internal:30080;
     proxy_http_version 1.1;
 
-    # Preserve the original Host so k3s ingress routes by hostname correctly
     proxy_set_header Host              $host;
     proxy_set_header X-Real-IP         $remote_addr;
     proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
-    # Tell k8s ingress the original scheme was HTTPS (security + redirect logic)
     proxy_set_header X-Forwarded-Proto https;
 
-    # WebSocket support (future-proof)
     proxy_set_header Upgrade    $http_upgrade;
     proxy_set_header Connection $connection_upgrade;
 
@@ -57,7 +51,6 @@ server {
     proxy_read_timeout    60s;
     proxy_send_timeout    60s;
 
-    # Retry on backend errors
     proxy_next_upstream error timeout http_502 http_503 http_504;
   }
 }

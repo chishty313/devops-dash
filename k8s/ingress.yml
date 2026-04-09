@@ -31,7 +31,7 @@ spec:
   ingressClassName: nginx
   # No TLS block — SSL terminates at Docker nginx, not here
   rules:
-    - host: qtec-k8s.chishty.me
+    - host: qtec-k8.chishty.me
       http:
         paths:
           - path: /api

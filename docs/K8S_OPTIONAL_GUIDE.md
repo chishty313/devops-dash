@@ -1,6 +1,6 @@
 # K8s Optional Lane — Step-by-Step Guide
 
-This guide gets `qtec-k8s.chishty.me` running on the **same server** as your existing
+This guide gets `qtec-k8.chishty.me` running on the **same server** as your existing
 Docker Compose production stack (`qtec.chishty.me`).
 
 **Zero risk to production:** the existing stack is never touched.
@@ -14,7 +14,7 @@ Browser
   │
   ├─ https://qtec.chishty.me ──► nginx (Docker) ──► Docker Compose stack   ← UNTOUCHED
   │
-  └─ https://qtec-k8s.chishty.me ──► nginx (Docker) ──► port 30080
+  └─ https://qtec-k8.chishty.me ──► nginx (Docker) ──► port 30080
                                                               │
                                                          k3s (Kubernetes)
                                                               │
@@ -71,14 +71,14 @@ In your DNS provider, add a new **A record**:
 
 | Field | Value |
 |-------|-------|
-| Host  | `qtec-k8s` |
+| Host  | `qtec-k8` |
 | Type  | A |
 | Value | `<YOUR VM PUBLIC IP>` (same IP as the main domain) |
 
 Wait 1–2 minutes, then verify:
 
 ```bash
-dig +short qtec-k8s.chishty.me
+dig +short qtec-k8.chishty.me
 # Should print your VM IP
 ```
 
@@ -89,8 +89,8 @@ dig +short qtec-k8s.chishty.me
 Your existing nginx Docker config expects certs at:
 
 ```
-/etc/letsencrypt/live/qtec-k8s.chishty.me/fullchain.pem
-/etc/letsencrypt/live/qtec-k8s.chishty.me/privkey.pem
+/etc/letsencrypt/live/qtec-k8.chishty.me/fullchain.pem
+/etc/letsencrypt/live/qtec-k8.chishty.me/privkey.pem
 ```
 
 **Stop Docker nginx temporarily** (< 10 seconds, prod goes down briefly):
@@ -103,7 +103,7 @@ docker compose stop nginx
 **Get the certificate:**
 
 ```bash
-sudo certbot certonly --standalone -d qtec-k8s.chishty.me
+sudo certbot certonly --standalone -d qtec-k8.chishty.me
 ```
 
 **Restart nginx:**
@@ -121,16 +121,19 @@ curl -sI https://qtec.chishty.me/api/status
 
 ---
 
-### Step 4 — Restart Docker nginx to pick up the new config
+### Step 4 — Enable the K8s vhost (only after certs exist)
 
-The new `nginx/conf.d/k8s.conf` file is already in the repo. Nginx needs a reload to read it:
+`nginx/conf.d/k8s.conf` is **not** committed: nginx would fail on every deploy if certs were missing. The template is `k8s.conf.example`.
+
+After Step 3 completes (cert files exist under `/etc/letsencrypt/live/qtec-k8.chishty.me/`):
 
 ```bash
 cd /opt/qtec
-docker compose exec nginx nginx -s reload
+cp nginx/conf.d/k8s.conf.example nginx/conf.d/k8s.conf
+docker compose exec nginx nginx -t && docker compose exec nginx nginx -s reload
 ```
 
-If reload fails (missing cert), check Step 3. If it succeeds, you can now visit `https://qtec-k8s.chishty.me/` — you will get a **502** until k8s pods are running, which is expected.
+Visit `https://qtec-k8.chishty.me/` — a **502** is normal until k8s pods are running.
 
 ---
 
@@ -221,7 +224,7 @@ Run all these checks from your **laptop** after deployment.
 ### Check 1 — API status endpoint
 
 ```bash
-curl -sS https://qtec-k8s.chishty.me/api/status | python3 -m json.tool
+curl -sS https://qtec-k8.chishty.me/api/status | python3 -m json.tool
 ```
 
 Expected response:
@@ -240,7 +243,7 @@ Expected response:
 ### Check 2 — POST data endpoint
 
 ```bash
-curl -sS -X POST https://qtec-k8s.chishty.me/api/data \
+curl -sS -X POST https://qtec-k8.chishty.me/api/data \
   -H "Content-Type: application/json" \
   -d '{"key":"k8s-test","value":"hello-from-k8s"}' | python3 -m json.tool
 ```
@@ -249,7 +252,7 @@ Expected: `201` status with an `id` and `createdAt`.
 
 ### Check 3 — Frontend loads in browser
 
-Open `https://qtec-k8s.chishty.me/` in your browser. The React SPA should load.
+Open `https://qtec-k8.chishty.me/` in your browser. The React SPA should load.
 
 ### Check 4 — Pods are running (on server)
 
@@ -295,7 +298,7 @@ kubectl get pdb -n qtec
 ```bash
 kubectl get ingress -n qtec
 # NAME            CLASS   HOSTS                    ADDRESS     PORTS   AGE
-# qtec-ingress    nginx   qtec-k8s.chishty.me      10.0.0.1    80      5m
+# qtec-ingress    nginx   qtec-k8.chishty.me      10.0.0.1    80      5m
 ```
 
 ### Check 9 — Logs
@@ -321,8 +324,8 @@ curl -sS https://qtec.chishty.me/api/status
 
 | Symptom | Where to look | Fix |
 |---------|--------------|-----|
-| `502 Bad Gateway` on `qtec-k8s.chishty.me` | Pods not running yet | `kubectl get pods -n qtec` — wait or check logs |
-| `curl: SSL certificate problem` | Cert not issued | Redo Step 3; check `ls /etc/letsencrypt/live/qtec-k8s.chishty.me/` |
+| `502 Bad Gateway` on `qtec-k8.chishty.me` | Pods not running yet | `kubectl get pods -n qtec` — wait or check logs |
+| `curl: SSL certificate problem` | Cert not issued | Redo Step 3; check `ls /etc/letsencrypt/live/qtec-k8.chishty.me/` |
 | `ImagePullBackOff` in pods | GHCR auth needed | Do Step 6 (private packages) |
 | `ErrImageNeverPull` | Wrong image tag | Make sure CI ran at least once and `IMAGE_OWNER` is lowercase |
 | `Connection refused` on port 30080 | k3s not running | `sudo systemctl status k3s` → `sudo systemctl start k3s` |

@@ -73,7 +73,7 @@ else
 fi
 
 # ─── 5. Pin nginx-ingress to NodePort 30080 (HTTP) ───────────────────────────
-# Docker nginx proxies qtec-k8s.chishty.me → 127.0.0.1:30080
+# Docker nginx proxies qtec-k8.chishty.me → 127.0.0.1:30080
 # so we need a known, stable port.
 info "Patching nginx-ingress NodePort to 30080 (HTTP)..."
 kubectl patch svc ingress-nginx-controller \
@@ -120,11 +120,12 @@ info "=================================================================="
 info " k3s + nginx-ingress setup COMPLETE"
 info "=================================================================="
 info " NEXT STEPS:"
-info "  1. Get TLS cert for qtec-k8s.chishty.me (see docs/K8S_OPTIONAL_GUIDE.md)"
-info "  2. Reload Docker nginx:  docker compose exec nginx nginx -s reload"
-info "  3. Create Kubernetes secrets:"
+info "  1. Get TLS cert for qtec-k8.chishty.me (see docs/K8S_OPTIONAL_GUIDE.md)"
+info "  2. cp nginx/conf.d/k8s.conf.example nginx/conf.d/k8s.conf"
+info "  3. docker compose exec nginx nginx -t && docker compose exec nginx nginx -s reload"
+info "  4. Create Kubernetes secrets:"
 info "     kubectl create secret generic qtec-secrets \\"
 info "       --namespace=qtec \\"
 info "       --from-literal=mongodb_uri='mongodb+srv://...'"
-info "  4. Push to main — GitHub Actions will deploy k8s manifests automatically"
+info "  5. Push to main — GitHub Actions will deploy k8s manifests automatically"
 info "=================================================================="
