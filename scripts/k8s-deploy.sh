@@ -67,12 +67,24 @@ apply k8s/pdb.yml
 info "Applying ingress..."
 apply k8s/ingress.yml
 
-# ─── Wait for rollouts ────────────────────────────────────────────────────────
-info "Waiting for backend rollout..."
-kubectl rollout status deployment/backend -n qtec --timeout=120s
+# ─── Wait for rollouts (image pulls + nginx startup can exceed 2 min on small VMs)
+ROLL_TIMEOUT="5m"
+info "Waiting for backend rollout (${ROLL_TIMEOUT})..."
+if ! kubectl rollout status deployment/backend -n qtec --timeout="${ROLL_TIMEOUT}"; then
+  warn "Backend rollout failed — diagnostics:"
+  kubectl get pods -n qtec -l app=backend -o wide
+  kubectl describe pod -n qtec -l app=backend | tail -80
+  exit 1
+fi
 
-info "Waiting for frontend rollout..."
-kubectl rollout status deployment/frontend -n qtec --timeout=120s
+info "Waiting for frontend rollout (${ROLL_TIMEOUT})..."
+if ! kubectl rollout status deployment/frontend -n qtec --timeout="${ROLL_TIMEOUT}"; then
+  warn "Frontend rollout failed — diagnostics:"
+  kubectl get pods -n qtec -l app=frontend -o wide
+  kubectl describe pod -n qtec -l app=frontend | tail -80
+  kubectl logs -n qtec -l app=frontend --tail=40 --all-containers=true 2>/dev/null || true
+  exit 1
+fi
 
 # ─── Summary ─────────────────────────────────────────────────────────────────
 echo ""
