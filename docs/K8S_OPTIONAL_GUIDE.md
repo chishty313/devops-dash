@@ -254,6 +254,8 @@ Expected: `201` status with an `id` and `createdAt`.
 
 Open `https://qtec-k8.chishty.me/` in your browser. The React SPA should load.
 
+**Grafana / Prometheus:** Those services run in **Docker Compose**, not inside k8s. After you copy `k8s.conf.example` → `k8s.conf` (includes `/grafana/` proxy to the Grafana container), use **`https://qtec-k8.chishty.me/grafana/`**. If Grafana redirects you to `https://qtec.chishty.me/grafana/` because `GF_SERVER_ROOT_URL` is set to the main domain, that is expected — use that URL for dashboards.
+
 ### Check 4 — Pods are running (on server)
 
 ```bash
