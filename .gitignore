@@ -35,5 +35,5 @@ Thumbs.db
 # Deploy state on server (blue/green); do not commit
 .active_color
 
-# K8s optional vhost — copy from k8s.conf.example after certbot (see docs/K8S_OPTIONAL_GUIDE.md)
+# K8s optional vhost — copy from k8s.conf.example after certbot (see README.md)
 nginx/conf.d/k8s.conf
