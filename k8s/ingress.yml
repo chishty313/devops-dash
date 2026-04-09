@@ -21,12 +21,8 @@ metadata:
     nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
 
-    # Security headers (inner hop — outer nginx already sets them,
-    # but set here too so direct NodePort access is also secured)
-    nginx.ingress.kubernetes.io/configuration-snippet: |
-      add_header X-Frame-Options "DENY" always;
-      add_header X-Content-Type-Options "nosniff" always;
-      add_header X-XSS-Protection "1; mode=block" always;
+    # Note: configuration-snippet is disabled by default on nginx-ingress (admission webhook).
+    # Security headers are applied at the outer Docker nginx (k8s.conf.example).
 spec:
   ingressClassName: nginx
   # No TLS block — SSL terminates at Docker nginx, not here
